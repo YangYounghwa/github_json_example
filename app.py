@@ -18,6 +18,10 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY")
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
 # GITHUB_REDIRECT_URI = os.getenv("GITHUB_REDIRECT_URI")
+
+if not all([app.secret_key, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET]):
+    raise ValueError("CRITICAL ERROR: One or more environment variables (FLASK_SECRET_KEY, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET) are missing. Please check your .env file.")
+
 GITHUB_AUTH_URL = "https://github.com/login/oauth/authorize"
 GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"
 GITHUB_API_URL = "https://api.github.com"
@@ -148,6 +152,12 @@ def show_repo_activity(owner, name):
     pretty_json = json.dumps(activity_json, indent=2)
 
     return render_template('show_json.html', repo_name=f"{owner}/{name}", json_data=pretty_json, raw_data=activity_json)
+
+
+
+
+
+
 
 if __name__ == "__main__":
     # Use 0.0.0.0 to make it accessible on your local network
