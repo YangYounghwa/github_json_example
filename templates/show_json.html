@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>JSON for {{ repo_name }}</title>
+    <style>
+        body { font-family: sans-serif; }
+        pre { background-color: #f4f4f4; padding: 1em; border: 1px solid #ddd; white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <h1>Activity JSON for: {{ repo_name }}</h1>
+    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a> | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+    <h2>Raw JSON Response Structure</h2>
+    <p>This is the exact data returned by the GitHub GraphQL API. You can now write code to parse this structure and generate your log.</p>
+    <pre><code>{{ json_data }}</code></pre>
+</body>
+</html>

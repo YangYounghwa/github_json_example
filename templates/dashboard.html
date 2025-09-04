@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+</head>
+<body>
+    <h1>Select a Repository</h1>
+    <p>Showing your 20 most recently updated repositories. Click one to inspect its recent activity.</p>
+    <a href="{{ url_for('logout') }}"><button>Logout</button></a>
+    <hr>
+    <ul>
+        {% for repo in repos %}
+            <li>
+                <a href="{{ url_for('show_repo_activity', owner=repo.owner.login, name=repo.name) }}">
+                    {{ repo.full_name }}
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
