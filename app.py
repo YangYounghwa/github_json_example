@@ -153,7 +153,11 @@ def show_repo_activity(owner, name):
 
     return render_template('show_json.html', repo_name=f"{owner}/{name}", json_data=pretty_json, raw_data=activity_json)
 
-
+@app.route("/logout")
+def logout():
+    """Clears the session and redirects to the homepage."""
+    session.clear()
+    return redirect(url_for('index'))
 
 
 
