@@ -1,26 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
+  <head>
+    <meta charset="UTF-8" />
     <title>Dashboard</title>
-</head>
-<body>
+  </head>
+  <body>
     <h1>Your Repositories</h1>
     <p>Showing your 30 most recently updated repositories.</p>
     <a href="{{ url_for('logout') }}"><button>Logout</button></a>
-    <hr>
+    <hr />
     <ul>
-        {% for repo in repos %}
-            <li>
-                <a href="{{ url_for('show_branch_summary', owner=repo.owner.login, name=repo.name) }}">
-                    {{ repo.full_name }} (View Branch Summary)
-                </a>
-                |
-                <a href="{{ url_for('show_branch_diffs', owner=repo.owner.login, name=repo.name) }}">
-                    (Compare Commits)
-                </a>
-            </li>
-        {% endfor %}
+      {% for repo in repos %}
+        <li>
+          <a href="{{ url_for('show_branch_summary', owner=repo.owner.login, name=repo.name) }}">{{ repo.full_name }} (View Branch Summary)</a>
+          |
+          <a href="{{ url_for('show_branch_diffs', owner=repo.owner.login, name=repo.name) }}">(Compare Commits)</a>
+          |
+          <a href="{{ url_for('commits_by_date', owner=repo.owner.login, name=repo.name) }}">(Search by Date)</a>
+        </li>
+      {% endfor %}
     </ul>
-</body>
+  </body>
 </html>
