@@ -5,14 +5,14 @@
     <title>Dashboard</title>
 </head>
 <body>
-    <h1>Select a Repository</h1>
-    <p>Showing your 20 most recently updated repositories. Click one to inspect its recent activity.</p>
+    <h1>Your Repositories</h1>
+    <p>Showing your 30 most recently updated repositories. Click one to analyze its branches.</p>
     <a href="{{ url_for('logout') }}"><button>Logout</button></a>
     <hr>
     <ul>
         {% for repo in repos %}
             <li>
-                <a href="{{ url_for('show_repo_activity', owner=repo.owner.login, name=repo.name) }}">
+                <a href="{{ url_for('show_branch_diffs', owner=repo.owner.login, name=repo.name) }}">
                     {{ repo.full_name }}
                 </a>
             </li>

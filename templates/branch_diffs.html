@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Branch Diffs for {{ repo_name }}</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        .branch-container { border: 1px solid #ccc; border-radius: 5px; margin-bottom: 2em; padding: 1em; }
+        .commit-list { list-style-type: none; padding-left: 0; }
+        .commit-list li { background-color: #f4f4f4; padding: 0.5em; border: 1px solid #ddd; margin-bottom: 0.5em; }
+        .commit-list a { text-decoration: none; color: #0366d6; }
+        .commit-list a:hover { text-decoration: underline; }
+        .commit-sha { font-family: monospace; }
+        h1, h2, h3 { color: #333; }
+    </style>
+</head>
+<body>
+    <h1>Branch Commit Differences</h1>
+    <h2>Repository: {{ repo_name }}</h2>
+    <p>Comparison against default branch: <strong>{{ default_branch }}</strong></p>
+    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a> | 
+    <a href="{{ url_for('show_branch_diffs', owner=owner, name=name, format='json') }}" target="_blank">View Raw API JSON</a>
+    <hr>
+
+    {% for branch_name, data in diffs.items() %}
+        <div class="branch-container">
+            <h2>Branch: {{ branch_name }}</h2>
+            
+            <h3>Ahead by {{ data.ahead_commits|length }} commit(s)</h3>
+            {% if data.ahead_commits %}
+                <ul class="commit-list">
+                {% for commit in data.ahead_commits %}
+                    <li>
+                        <a href="{{ url_for('show_commit_detail', owner=owner, name=name, sha=commit.full_sha) }}">
+                            <span class="commit-sha">{{ commit.sha }}</span> - 
+                            {{ commit.message }} (by <em>{{ commit.author }}</em>)
+                        </a>
+                    </li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <p>This branch is up-to-date with {{ default_branch }}.</p>
+            {% endif %}
+
+            <hr style="border-style: dashed; border-width: 1px 0 0 0;">
+
+            <h3>Behind by {{ data.behind_commits|length }} commit(s)</h3>
+            {% if data.behind_commits %}
+                <ul class="commit-list">
+                {% for commit in data.behind_commits %}
+                    <li>
+                        <a href="{{ url_for('show_commit_detail', owner=owner, name=name, sha=commit.full_sha) }}">
+                            <span class="commit-sha">{{ commit.sha }}</span> - 
+                            {{ commit.message }} (by <em>{{ commit.author }}</em>)
+                        </a>
+                    </li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <p>This branch contains all commits from {{ default_branch }}.</p>
+            {% endif %}
+        </div>
+    {% else %}
+        <p>No other branches found to compare.</p>
+    {% endfor %}
+
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Commit Detail</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        .commit-info { background-color: #f4f4f4; padding: 1em; border: 1px solid #ddd; margin-bottom: 2em; }
+        .commit-info p { margin: 0.5em 0; }
+        .file-diff { border: 1px solid #ccc; border-radius: 5px; margin-bottom: 1em; }
+        .file-header { background-color: #eaf5ff; padding: 0.5em 1em; border-bottom: 1px solid #ccc; font-weight: bold; }
+        .file-patch { font-family: monospace; white-space: pre; overflow-x: auto; padding: 1em; font-size: 0.85em; line-height: 1.4; }
+        .diff-add { color: #22863a; background-color: #e6ffed; }
+        .diff-remove { color: #b31d28; background-color: #ffeef0; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <h1>Commit Detail</h1>
+    <p>
+        <a href="{{ url_for('show_branch_diffs', owner=owner, name=name) }}">Back to Branch Comparison</a> |
+        <a href="{{ url_for('show_commit_detail', owner=owner, name=name, sha=commit.sha, format='json') }}" target="_blank">View Raw API JSON</a>
+    </p>
+
+    <div class="commit-info">
+        <h3>{{ commit.message.split('\n')[0] }}</h3>
+        <p><strong>Commit:</strong> {{ commit.sha }}</p>
+        <p><strong>Author:</strong> {{ commit.author }}</p>
+        <p><strong>Date:</strong> {{ commit.date }}</p>
+        <hr>
+        <pre>{{ commit.message }}</pre>
+    </div>
+
+    <h2>File Changes ({{ commit.files|length }})</h2>
+    {% for file in commit.files %}
+        <div class="file-diff">
+            <div class="file-header">
+                {{ file.status | capitalize }}: {{ file.filename }} 
+                <span style="float: right;">
+                    <span class="diff-add">+{{ file.additions }}</span> / 
+                    <span class="diff-remove">-{{ file.deletions }}</span>
+                </span>
+            </div>
+            <div class="file-patch">
+                <code>
+                {% for line in file.patch.split('\n') %}
+                    {% if line.startswith('+') and line|length > 1 %}
+                        <span class="diff-add">{{ line }}</span>
+                    {% elif line.startswith('-') and line|length > 1 %}
+                        <span class="diff-remove">{{ line }}</span>
+                    {% else %}
+                        <span>{{ line }}</span>
+                    {% endif %}
+                {% endfor %}
+                </code>
+            </div>
+        </div>
+    {% endfor %}
+
+</body>
+</html>

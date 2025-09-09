@@ -1,46 +1,50 @@
 import os
 import requests
 import json
-from datetime import datetime, timedelta
-from flask import Flask, request, redirect, url_for, session, render_template
-
+from datetime import datetime, timedelta, timezone
+from flask import Flask, jsonify, request, redirect, url_for, session, render_template
 from dotenv import load_dotenv
 
-
-
+# Load environment variables from .env file
 load_dotenv()
 
-app= Flask(__name__)
+app = Flask(__name__)
+
+# --- Configuration and Sanity Check ---
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
-
-
-
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
-# GITHUB_REDIRECT_URI = os.getenv("GITHUB_REDIRECT_URI")
 
 if not all([app.secret_key, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET]):
-    raise ValueError("CRITICAL ERROR: One or more environment variables (FLASK_SECRET_KEY, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET) are missing. Please check your .env file.")
+    raise ValueError("CRITICAL ERROR: One or more environment variables are missing. Please check your .env file.")
 
+# --- GitHub API Constants ---
 GITHUB_AUTH_URL = "https://github.com/login/oauth/authorize"
 GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"
 GITHUB_API_URL = "https://api.github.com"
 
+# =============================================================================
+# AUTHENTICATION ROUTES
+# =============================================================================
 
 @app.route("/")
 def index():
-    """Homepage : Shows login link if not authenticated."""
-    if 'github_token' in session:
-        return redirect(url_for('dashboard'))
+    """Homepage: Shows login link if not authenticated."""
     return render_template('index.html')
 
 @app.route("/login")
 def login():
-    """Redirects user to GitHub login page."""
-    scope = "repo"
-    return redirect(f"{GITHUB_AUTH_URL}?client_id={GITHUB_CLIENT_ID}&scope={scope}")
+    """Redirects user to GitHub for authorization."""
+    if 'github_token' not in session:
+        scope = "repo"
+        return redirect(f"{GITHUB_AUTH_URL}?client_id={GITHUB_CLIENT_ID}&scope={scope}")
+    return redirect(url_for('dashboard'))
 
-
+@app.route("/logout")
+def logout():
+    """Clears the session and redirects to the homepage."""
+    session.clear()
+    return redirect(url_for('index'))
 
 @app.route("/github/callback")
 def github_callback():
@@ -49,7 +53,6 @@ def github_callback():
     if not code:
         return "Error: No code provided.", 400
 
-    # Exchange the temporary code for an access token
     token_response = requests.post(
         GITHUB_TOKEN_URL,
         headers={"Accept": "application/json"},
@@ -61,13 +64,11 @@ def github_callback():
     )
     token_response.raise_for_status()
     session['github_token'] = token_response.json()['access_token']
-
     return redirect(url_for('dashboard'))
 
-
-# -----------------------------------------------
-# 2. SELECT REPOSITORY
-# -----------------------------------------------
+# =============================================================================
+# CORE APPLICATION ROUTES
+# =============================================================================
 
 @app.route("/dashboard")
 def dashboard():
@@ -76,134 +77,127 @@ def dashboard():
         return redirect(url_for('login'))
 
     headers = {"Authorization": f"Bearer {session['github_token']}"}
-    # Using the REST API here is simple and efficient for getting a repo list
-    repo_response = requests.get(f"{GITHUB_API_URL}/user/repos?sort=updated&per_page=20", headers=headers)
+    repo_response = requests.get(f"{GITHUB_API_URL}/user/repos?sort=updated&per_page=30", headers=headers)
     repo_response.raise_for_status()
     repos = repo_response.json()
-
     return render_template('dashboard.html', repos=repos)
 
-
-
-# -----------------------------------------------
-# 3. GET RELEVANT ACTIVITY & 4. SHOW JSON
-# -----------------------------------------------
-# In app.py, replace the whole function with this one.
-
-@app.route("/repo/<owner>/<name>")
-def show_repo_activity(owner, name):
-    """Fetches activity using GraphQL, filters it, and displays the relevant JSON."""
+@app.route("/repo/<owner>/<name>/branch-diffs")
+def show_branch_diffs(owner, name):
     if 'github_token' not in session:
         return redirect(url_for('login'))
 
     headers = {"Authorization": f"Bearer {session['github_token']}"}
+    repo_url = f"{GITHUB_API_URL}/repos/{owner}/{name}"
     
-    # Define the time window for the activity search (e.g., last 30 days)
-    # We use this for filtering *after* the API call
-    since_datetime = datetime.utcnow() - timedelta(days=30)
+    # This dictionary will hold the raw data if JSON format is requested
+    raw_api_responses = {}
 
-    # 1. THE CORRECTED GRAPHQL QUERY
-    # We removed the invalid 'since' arguments from comments and commits.
-    graphql_query = """
-    query GetRecentActivity($owner: String!, $repo: String!) {
-      repository(owner: $owner, name: $repo) {
-        nameWithOwner
-        pullRequests(first: 30, orderBy: {field: UPDATED_AT, direction: DESC}) {
-          nodes {
-            updatedAt
-            createdAt
-            title
-            number
-            author { login }
-            comments(last: 50) {
-              nodes {
-                author { login }
-                bodyText
-                createdAt
-              }
-            }
-            commits(last: 50) {
-              nodes {
-                commit {
-                  author { name }
-                  messageHeadline
-                  oid
-                  committedDate
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    """
+    try:
+        repo_info_res = requests.get(repo_url, headers=headers)
+        repo_info_res.raise_for_status()
+        repo_info_data = repo_info_res.json()
+        raw_api_responses['repository_info'] = repo_info_data
+        default_branch = repo_info_data['default_branch']
 
-    variables = {
-        "owner": owner,
-        "repo": name
-    }
-
-    response = requests.post(
-        f"{GITHUB_API_URL}/graphql",
-        headers=headers,
-        json={"query": graphql_query, "variables": variables}
-    )
-    response.raise_for_status()
-    raw_data = response.json()
-
-    # If the API itself returned errors, display them.
-    if "errors" in raw_data:
-        pretty_json = json.dumps(raw_data, indent=2)
-        return render_template('show_json.html', repo_name=f"{owner}/{name}", json_data=pretty_json)
-
-    # 2. FILTER THE RESULTS IN PYTHON
-    filtered_activity = []
-    all_pull_requests = raw_data.get("data", {}).get("repository", {}).get("pullRequests", {}).get("nodes", [])
-
-    for pr in all_pull_requests:
-        # The `updatedAt` field is a string, so we need to parse it to a datetime object
-        pr_updated_at = datetime.fromisoformat(pr['updatedAt'].replace('Z', '+00:00'))
+        branches_res = requests.get(f"{repo_url}/branches", headers=headers)
+        branches_res.raise_for_status()
+        branches_data = branches_res.json()
+        raw_api_responses['branches_list'] = branches_data
         
-        # Only process PRs that have been updated within our time window
-        if pr_updated_at >= since_datetime:
+        raw_api_responses['comparisons'] = {}
+        branch_diffs = {}
+
+        for branch in branches_data:
+            branch_name = branch['name']
+            if branch_name == default_branch:
+                continue
+
+            # Compare: AHEAD
+            ahead_url = f"{repo_url}/compare/{default_branch}...{branch_name}"
+            ahead_res = requests.get(ahead_url, headers=headers)
+            ahead_res.raise_for_status()
+            ahead_data = ahead_res.json()
+            raw_api_responses['comparisons'][f"{default_branch}_vs_{branch_name}"] = ahead_data
+
+            # Compare: BEHIND
+            behind_url = f"{repo_url}/compare/{branch_name}...{default_branch}"
+            behind_res = requests.get(behind_url, headers=headers)
+            behind_res.raise_for_status()
+            behind_data = behind_res.json()
+            raw_api_responses['comparisons'][f"{branch_name}_vs_{default_branch}"] = behind_data
+        
+        # NEW LOGIC: Check for the format parameter
+        if request.args.get('format') == 'json':
+            # jsonify correctly sets the Content-Type header to application/json
+            return jsonify(raw_api_responses)
+
+        # --- If not returning JSON, process the data for the HTML template ---
+        for branch_name, ahead_data in raw_api_responses['comparisons'].items():
+            if not branch_name.startswith(default_branch): continue
             
-            # Filter comments for this PR
-            relevant_comments = []
-            for comment in pr["comments"]["nodes"]:
-                comment_created_at = datetime.fromisoformat(comment['createdAt'].replace('Z', '+00:00'))
-                if comment_created_at >= since_datetime:
-                    relevant_comments.append(comment)
+            current_branch_name = branch_name.split('_vs_')[1]
+            branch_diffs[current_branch_name] = {"ahead_commits": [], "behind_commits": []}
             
-            # Filter commits for this PR
-            relevant_commits = []
-            for commit_node in pr["commits"]["nodes"]:
-                commit_date = datetime.fromisoformat(commit_node['commit']['committedDate'].replace('Z', '+00:00'))
-                if commit_date >= since_datetime:
-                    relevant_commits.append(commit_node)
+            for commit in ahead_data.get('commits', []):
+                branch_diffs[current_branch_name]["ahead_commits"].append({
+                    "sha": commit['sha'][:7], "full_sha": commit['sha'],
+                    "message": commit['commit']['message'].split('\n')[0],
+                    "author": commit['commit']['author']['name']
+                })
             
-            # Rebuild the PR object with only the filtered data
-            pr["comments"]["nodes"] = relevant_comments
-            pr["commits"]["nodes"] = relevant_commits
-            filtered_activity.append(pr)
+            behind_data = raw_api_responses['comparisons'][f"{current_branch_name}_vs_{default_branch}"]
+            for commit in behind_data.get('commits', []):
+                 branch_diffs[current_branch_name]["behind_commits"].append({
+                    "sha": commit['sha'][:7], "full_sha": commit['sha'],
+                    "message": commit['commit']['message'].split('\n')[0],
+                    "author": commit['commit']['author']['name']
+                })
 
-    # Prepare the final, filtered data for display
-    final_data_to_display = {
-        "info": f"Showing activity since {since_datetime.isoformat()}",
-        "filteredPullRequests": filtered_activity
-    }
-    pretty_json = json.dumps(final_data_to_display, indent=2)
+    except requests.exceptions.HTTPError as e:
+        return jsonify({"error": str(e)}), 500 if request.args.get('format') == 'json' else (f"An API error occurred: {e}", 500)
 
-    return render_template('show_json.html', repo_name=f"{owner}/{name}", json_data=pretty_json)
-@app.route("/logout")
-def logout():
-    """Clears the session and redirects to the homepage."""
-    session.clear()
-    return redirect(url_for('index'))
+    return render_template('branch_diffs.html',
+                           repo_name=f"{owner}/{name}", owner=owner, name=name,
+                           diffs=branch_diffs, default_branch=default_branch)
 
+@app.route("/repo/<owner>/<name>/commit/<sha>")
+def show_commit_detail(owner, name, sha):
+    if 'github_token' not in session:
+        return redirect(url_for('login'))
 
+    headers = {"Authorization": f"Bearer {session['github_token']}"}
+    commit_url = f"{GITHUB_API_URL}/repos/{owner}/{name}/commits/{sha}"
 
+    try:
+        response = requests.get(commit_url, headers=headers)
+        response.raise_for_status()
+        commit_data = response.json()
+
+        # NEW LOGIC: Check for the format parameter
+        if request.args.get('format') == 'json':
+            return jsonify(commit_data)
+
+        # --- If not returning JSON, process the data for the HTML template ---
+        commit_details = {
+            "sha": commit_data['sha'], "author": commit_data['commit']['author']['name'],
+            "date": commit_data['commit']['author']['date'], "message": commit_data['commit']['message'],
+            "files": []
+        }
+        for file in commit_data.get('files', []):
+            commit_details['files'].append({
+                "filename": file['filename'], "status": file['status'],
+                "additions": file['additions'], "deletions": file['deletions'],
+                "patch": file.get('patch', 'No patch available.')
+            })
+
+    except requests.exceptions.HTTPError as e:
+         return jsonify({"error": str(e)}), 500 if request.args.get('format') == 'json' else (f"An API error occurred: {e}", 500)
+
+    return render_template('commit_detail.html',
+                           repo_name=f"{owner}/{name}", owner=owner, name=name,
+                           commit=commit_details)
 
 
 if __name__ == "__main__":
-    # Use 0.0.0.0 to make it accessible on your local network
     app.run(host="0.0.0.0", port=5000, debug=True)
