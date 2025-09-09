@@ -197,7 +197,89 @@ def show_commit_detail(owner, name, sha):
     return render_template('commit_detail.html',
                            repo_name=f"{owner}/{name}", owner=owner, name=name,
                            commit=commit_details)
+    
+    
+    
+@app.route("/repo/<owner>/<name>/branch-summary")
+def show_branch_summary(owner, name):
+    if 'github_token' not in session:
+        return redirect(url_for('login'))
 
+    headers = {"Authorization": f"Bearer {session['github_token']}"}
+
+    try:
+        # STEP 1: Make a simple REST call to get the default branch name first.
+        repo_url = f"{GITHUB_API_URL}/repos/{owner}/{name}"
+        repo_info_res = requests.get(repo_url, headers=headers)
+        repo_info_res.raise_for_status()
+        default_branch = repo_info_res.json()['default_branch']
+
+        # STEP 2: Use the corrected GraphQL query.
+        graphql_query = """
+        query GetBranchTimestamps($owner: String!, $repo: String!, $defaultBranch: String!) {
+          repository(owner: $owner, name: $repo) {
+            refs(refPrefix: "refs/heads/", first: 100, orderBy: {field: TAG_COMMIT_DATE, direction: DESC}) {
+              nodes {
+                name
+                target {
+                  ... on Commit {
+                    committedDate
+                  }
+                }
+                compare(headRef: $defaultBranch) {
+                  commits(last: 1) {
+                    nodes {
+                      committedDate
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+        # STEP 3: Pass the default_branch name as a variable to the query.
+        variables = {
+            "owner": owner, 
+            "repo": name,
+            "defaultBranch": default_branch
+        }
+    
+        response = requests.post(
+            f"{GITHUB_API_URL}/graphql",
+            headers=headers,
+            json={"query": graphql_query, "variables": variables}
+        )
+        response.raise_for_status()
+        raw_data = response.json()
+
+        if "errors" in raw_data:
+            # We now print the full error for better debugging
+            return f"GraphQL Error: {raw_data['errors']}", 500
+
+        # Process the raw data (this logic remains the same)
+        branch_list = []
+        refs = raw_data.get("data", {}).get("repository", {}).get("refs", {}).get("nodes", [])
+        
+        for ref in refs:
+            latest_commit_date = ref.get("target", {}).get("committedDate")
+            first_commit_nodes = ref.get("compare", {}).get("commits", {}).get("nodes", [])
+            first_commit_date = None
+            if first_commit_nodes:
+                first_commit_date = first_commit_nodes[0].get("committedDate")
+
+            branch_list.append({
+                "name": ref['name'],
+                "latest_change": latest_commit_date,
+                "first_change": first_commit_date or latest_commit_date 
+            })
+
+    except requests.exceptions.HTTPError as e:
+        return f"An API error occurred: {e}", 500
+
+    return render_template('branch_summary.html', 
+                           repo_name=f"{owner}/{name}", 
+                           branches=branch_list)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

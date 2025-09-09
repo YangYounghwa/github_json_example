@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Branch Summary for {{ repo_name }}</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 0.8em; text-align: left; }
+        th { background-color: #f4f4f4; }
+        h1, h2 { color: #333; }
+    </style>
+</head>
+<body>
+    <h1>Branch Summary</h1>
+    <h2>Repository: {{ repo_name }}</h2>
+    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+    <hr>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Branch Name</th>
+                <th>First Unique Change Time (UTC)</th>
+                <th>Latest Change Time (UTC)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for branch in branches %}
+            <tr>
+                <td><strong>{{ branch.name }}</strong></td>
+                <td>{{ branch.first_change }}</td>
+                <td>{{ branch.latest_change }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="3">No branches found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+</html>
