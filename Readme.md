@@ -6,9 +6,9 @@ Use this for checking.
 
 
 ## How to run
-'''
+```
 flask run
-'''
+```
 
 
 ## .env files for API keys
