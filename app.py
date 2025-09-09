@@ -110,8 +110,8 @@ def show_branch_diffs(owner, name):
 
         for branch in branches_data:
             branch_name = branch['name']
-            if branch_name == default_branch:
-                continue
+            #if branch_name == default_branch:
+            #    continue
 
             # Compare: AHEAD
             ahead_url = f"{repo_url}/compare/{default_branch}...{branch_name}"
