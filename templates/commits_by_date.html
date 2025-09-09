@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Search Commits by Date</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        .form-container { background-color: #f4f4f4; padding: 1em; border: 1px solid #ddd; margin-bottom: 2em; }
+        .form-container label { display: block; margin-bottom: 0.5em; font-weight: bold; }
+        .form-container input { width: 250px; padding: 0.5em; margin-bottom: 1em; }
+        .commit-list { list-style-type: none; padding-left: 0; }
+        .commit-list li { background-color: #f9f9f9; padding: 0.5em; border: 1px solid #eee; margin-bottom: 0.5em; }
+        .commit-list a { text-decoration: none; color: #0366d6; }
+        .commit-list a:hover { text-decoration: underline; }
+        .commit-sha { font-family: monospace; }
+        .error { color: #b31d28; background-color: #ffeef0; padding: 1em; border: 1px solid #b31d28; }
+    </style>
+</head>
+<body>
+    <h1>Search Commits by Date Range</h1>
+    <h2>Repository: {{ repo_name }}</h2>
+    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+
+    <div class="form-container">
+        <form method="GET" action="">
+            <div>
+                <label for="branch">Branch Name:</label>
+                <input type="text" id="branch" name="branch" value="{{ request.args.get('branch', 'main') }}" required>
+            </div>
+            <div>
+                <label for="since">Start Time (Since):</label>
+                <input type="datetime-local" id="since" name="since" value="{{ request.args.get('since', '') }}" required>
+            </div>
+            <div>
+                <label for="until">End Time (Until):</label>
+                <input type="datetime-local" id="until" name="until" value="{{ request.args.get('until', '') }}" required>
+            </div>
+            <button type="submit">Search Commits</button>
+        </form>
+    </div>
+
+    {% if error %}
+        <div class="error">
+            <h3>An error occurred:</h3>
+            <p>{{ error }}</p>
+        </div>
+    {% endif %}
+
+    {# This 'is defined' check is crucial. It differentiates between the initial page load and a search that returned 0 results. #}
+    {% if commits is defined %}
+        <hr>
+        <h3>Search Results</h3>
+        {% if commits %}
+            <ul class="commit-list">
+                {% for commit in commits %}
+                <li>
+                    <a href="{{ url_for('show_commit_detail', owner=owner, name=name, sha=commit.full_sha) }}">
+                        <span class="commit-sha">{{ commit.sha }}</span> - 
+                        {{ commit.message }}
+                    </a>
+                    <br>
+                    <small>by <em>{{ commit.author }}</em> on {{ commit.date }}</small>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No commits found in the specified time range for this branch.</p>
+        {% endif %}
+    {% endif %}
+
+</body>
+</html>

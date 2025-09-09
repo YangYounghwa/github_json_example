@@ -280,6 +280,61 @@ def show_branch_summary(owner, name):
     return render_template('branch_summary.html', 
                            repo_name=f"{owner}/{name}", 
                            branches=branch_list)
+    
+    
+@app.route("/repo/<owner>/<name>/commits-by-date")
+def commits_by_date(owner, name):
+    if 'github_token' not in session:
+        return redirect(url_for('login'))
+
+    headers = {"Authorization": f"Bearer {session['github_token']}"}
+    commits_list = None # Use None to indicate no search has been performed yet
+    
+    # Check if the form has been submitted with the required parameters
+    branch = request.args.get('branch')
+    since_str = request.args.get('since')
+    until_str = request.args.get('until')
+
+    if branch and since_str and until_str:
+        try:
+            # The HTML datetime-local input gives a string like "2025-07-06T17:00".
+            # The GitHub API requires a full ISO 8601 UTC timestamp. We add ":00Z" for this.
+            params = {
+                "sha": branch,
+                "since": f"{since_str}:00Z",
+                "until": f"{until_str}:00Z",
+                "per_page": 100 # Get up to 100 commits
+            }
+
+            commits_url = f"{GITHUB_API_URL}/repos/{owner}/{name}/commits"
+            response = requests.get(commits_url, headers=headers, params=params)
+            response.raise_for_status()
+            
+            raw_commits = response.json()
+            commits_list = []
+            for commit in raw_commits:
+                commits_list.append({
+                    "sha": commit['sha'][:7],
+                    "full_sha": commit['sha'],
+                    "message": commit['commit']['message'].split('\n')[0],
+                    "author": commit['commit']['author']['name'],
+                    "date": commit['commit']['author']['date']
+                })
+
+        except requests.exceptions.HTTPError as e:
+            # Pass error information to the template
+            return render_template('commits_by_date.html', 
+                                   repo_name=f"{owner}/{name}", owner=owner, name=name,
+                                   error=str(e))
+
+    # If the form wasn't submitted, 'commits_list' is still None.
+    # If it was submitted, 'commits_list' contains the results.
+    return render_template('commits_by_date.html', 
+                           repo_name=f"{owner}/{name}", owner=owner, name=name,
+                           commits=commits_list)
+    
+    
+        
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

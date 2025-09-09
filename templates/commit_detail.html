@@ -9,9 +9,22 @@
         .commit-info p { margin: 0.5em 0; }
         .file-diff { border: 1px solid #ccc; border-radius: 5px; margin-bottom: 1em; }
         .file-header { background-color: #eaf5ff; padding: 0.5em 1em; border-bottom: 1px solid #ccc; font-weight: bold; }
-        .file-patch { font-family: monospace; white-space: pre; overflow-x: auto; padding: 1em; font-size: 0.85em; line-height: 1.4; }
+        
+        /* Removed 'white-space: pre' from the container */
+        .file-patch { font-family: monospace; font-size: 0.85em; line-height: 1.4; overflow-x: auto; }
+        
+        /* Common style for all diff lines */
+        .diff-line {
+            padding: 0 1em;
+            white-space: pre-wrap; /* Preserves space within a line, but wraps long lines */
+            word-wrap: break-word;
+        }
+
+        /* Specific styles for added, removed, and context lines */
         .diff-add { color: #22863a; background-color: #e6ffed; }
         .diff-remove { color: #b31d28; background-color: #ffeef0; }
+        .diff-context { color: #586069; }
+
         pre { white-space: pre-wrap; word-wrap: break-word; }
     </style>
 </head>
@@ -42,17 +55,17 @@
                 </span>
             </div>
             <div class="file-patch">
-                <code>
+                {# We no longer need the outer <code> tag #}
                 {% for line in file.patch.split('\n') %}
+                    {# We now use DIVs which are block elements #}
                     {% if line.startswith('+') and line|length > 1 %}
-                        <span class="diff-add">{{ line }}</span>
+                        <div class="diff-line diff-add">{{ line }}</div>
                     {% elif line.startswith('-') and line|length > 1 %}
-                        <span class="diff-remove">{{ line }}</span>
+                        <div class="diff-line diff-remove">{{ line }}</div>
                     {% else %}
-                        <span>{{ line }}</span>
+                        <div class="diff-line diff-context">{{ line }}</div>
                     {% endif %}
                 {% endfor %}
-                </code>
             </div>
         </div>
     {% endfor %}
